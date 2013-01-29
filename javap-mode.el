@@ -1,6 +1,54 @@
+(defvar java-ident-re "[a-zA-Z_$][a-zA-Z0-9_$]*")
+(defvar java-ident-dotted-re (concat java-ident-re "\\(\\." java-ident-re "\\)*"))
+(defvar java-ident-slashed-re (concat java-ident-re "\\(/" java-ident-re "\\)+"))
+(defvar java-bytecodes
+  (concat "\\([scadiflb]a?"
+          "\\(\\(load\\)\\|\\(store\\)\\|\\(const\\)\\|\\(return\\)\\)\\(_[0123]\\)?\\)"
+          "\\|"
+          "\\([scadiflb]2[scadiflb]\\)"
+          "\\|"
+          "\\(invoke\\(dynamic\\|interface\\|special\\|virtual\\|static\\)\\)"
+          "\\|"
+          "\\(return\\|new\\|pop2\\|pop\\|nop\\|checkcast\\|dup\\|getstatic\\)"
+          "\\|"
+          "\\(getfield\\|putfield\\)"))
+
+(defvar javap-font-lock-keywords
+  `(
+    ("\\(BoxesRunTime.*?\\):"
+     1 font-lock-warning-face)
+
+    ("[0-9]+\\:"
+     . font-lock-preprocessor-face)
+
+    (,java-bytecodes
+     . font-lock-constant-face)
+
+    ("\\(public\\)\\|\\(private\\)\\|\\(final\\)\\|\\(static\\)\\|\\(class\\)"
+     . font-lock-keyword-face)
+
+    ("\\(\svoid\s\\)\\|long\\|int\\|byte\\|short"
+     . font-lock-type-face)
+
+    ("\\(#[0-9]+\\)"
+     1 font-lock-preprocessor-face)
+
+    ("Method\\|Field"
+     . font-lock-string-face)
+
+    (,java-ident-slashed-re
+     . font-lock-function-name-face)
+
+    (,java-ident-dotted-re
+     . font-lock-type-face)))
+
+
+
 (define-derived-mode javap-mode fundamental-mode "Java Decompile"
   "javap-mode is for viewing decompiled class files"
-
+  (set (make-local-variable 'font-lock-defaults) '(javap-font-lock-keywords))
+  (setq comment-start "//")
+  (setq commend-end "")
 )
 
 (defun parse-java-class-name (apath)
