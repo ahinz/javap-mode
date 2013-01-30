@@ -104,25 +104,30 @@
   (setq commend-end "")
 )
 
+(defun javap-regular-class (apath)
+  (let ((dir (file-name-directory apath))
+        (class (file-name-sans-extension (file-name-nondirectory apath))))
+    (list dir 
+          (replace-regexp-in-string "\\$" "\\\\$" class))))
+
 (defun parse-java-class-name (apath)
   (let* ((parts (split-string apath "classes"))
          (pathp (first parts))
-         (classp (file-name-sans-extension (second parts)))
+         (classp (file-name-sans-extension (or (second parts) (first parts))))
          (classdot 
           (replace-regexp-in-string "\\$" "\\\\$" (replace-regexp-in-string "/" "." classp))))
-    (list 
-     (concat pathp "classes/")
-     (if (string-equal "." (substring classdot 0 1))
-         (substring classdot 1)
-       classdot)
-     )))
+    (if (= (length parts) 1)
+        (javap-regular-class apath)
+      (list 
+       (concat pathp "classes/")
+       (if (string-equal "." (substring classdot 0 1))
+           (substring classdot 1)
+         classdot)))))
 
 (defun call-javap (cwd class)
   (let* ((args (concat (if javap-enabled-complete "-c") " "))
          (wrapped-command (concat "pushd " cwd " && javap " args class " && popd")))
     (shell-command-to-string wrapped-command)))
-
-(parse-java-class-name "/home/ahinz/src/azavea/geotrellis/target/scala-2.10/classes/geotrellis/raster/op/zonal/Histogram$$anonfun$createTileResults$1.class")
 
 (defun update-buffer-with-javap ()
   (let ((buf (current-buffer))
