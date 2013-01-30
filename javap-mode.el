@@ -5,9 +5,45 @@
   (setq javap-enabled-complete (if javap-enabled-complete nil 1))
   (update-buffer-with-javap))
 
+;; This function from Magnar
+(defun javap-trim-right (s)
+  (if (string-match "[ \t\n\r]+\\'" s)
+      (replace-match "" t t s)
+    s))
+
+(defun javap-parse-classlike (classlike)
+  (if (search "/" classlike)
+      (javap-parse-class-as-path classlike)
+    (javap-parse-class-as-dotted classlike)))
+
+(defun javap-parse-class-as-path (class)
+  (let* ((path-and-method (split-string (substring class 0 -1) "\\."))
+         (path (first path-and-method))
+         (meth (second path-and-method)))
+    (list (concat (javap-trim-right path) ".class") meth)))
+
+(defun javap-jump-to-method (method-name)
+  (search-forward (concat method-name "("))
+  (backward-char))
+
+(defun javap-open-file (class-name method-name)
+  (let ((base-path (first (parse-java-class-name buffer-file-name)))) 
+    (find-file (concat base-path class-name))
+    (when method-name
+      (javap-jump-to-method method-name))))
+
+(defun javap-open-file-at-point ()
+  (interactive)
+  (save-excursion
+    (let ((start (re-search-backward "\s"))
+          (end (progn (forward-char) (re-search-forward ":\\|\s"))))
+      (apply 'javap-open-file
+             (javap-parse-classlike (buffer-substring-no-properties (+ 1 start) end))))))
+
 (setq javap-mode-map (make-keymap))
 (suppress-keymap javap-mode-map t)
 (define-key javap-mode-map (kbd "r") 'javap-toggle-complete)
+(define-key javap-mode-map (kbd "RET") 'javap-open-file-at-point)
 
 (setq java-ident-re "[a-zA-Z_$][a-zA-Z0-9_$]*")
 (setq java-ident-dotted-re (concat java-ident-re "\\(\\." java-ident-re "\\)*"))
@@ -38,16 +74,16 @@
     (,java-bytecodes
      . font-lock-constant-face)
 
-    ("\\(public\\)\\|\\(private\\)\\|\\(final\\)\\|\\(static\\)\\|\\(class\\)"
+    ("\\(public\\)\\|\\(private\\)\\|\\(final\\)\\|\\(static\\)\\|\\(class\\)\\|\\(extends\\)"
      . font-lock-keyword-face)
 
-    ("\\(\svoid\s\\)\\|\\(long\\)\\|\\(int\\)\\|\\(byte\\)\\|\\(short\\)"
+    ("\s\\(\\(void\s\\)\\|\\(long\\)\\|\\(int\\)\\|\\(byte\\)\\|\\(short\\)\\)"
      . font-lock-type-face)
 
     ("\\(#[0-9]+\\)"
      1 font-lock-preprocessor-face)
 
-    (,(concat "\\(Method\\|Field\\)\s" java-ident-slashed-re "\\(\\." java-ident-re "\\)?")
+    (,(concat "\\(InterfaceMethod\\|Method\\|Field\\)\s" java-ident-slashed-re "\\(\\." java-ident-re "\\)?")
      . font-lock-constant-face)
 
     ;; (,java-ident-slashed-re
