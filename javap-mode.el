@@ -1,7 +1,18 @@
-(defvar java-ident-re "[a-zA-Z_$][a-zA-Z0-9_$]*")
-(defvar java-ident-dotted-re (concat java-ident-re "\\(\\." java-ident-re "\\)*"))
-(defvar java-ident-slashed-re (concat java-ident-re "\\(/" java-ident-re "\\)+"))
-(defvar java-bytecodes
+(defvar javap-mode-map nil "Keymap for javap")
+
+(defun javap-toggle-complete ()
+  (interactive)
+  (setq javap-enabled-complete (if javap-enabled-complete nil 1))
+  (update-buffer-with-javap))
+
+(setq javap-mode-map (make-keymap))
+(suppress-keymap javap-mode-map t)
+(define-key javap-mode-map (kbd "r") 'javap-toggle-complete)
+
+(setq java-ident-re "[a-zA-Z_$][a-zA-Z0-9_$]*")
+(setq java-ident-dotted-re (concat java-ident-re "\\(\\." java-ident-re "\\)*"))
+(setq java-ident-slashed-re (concat java-ident-re "\\(/" java-ident-re "\\)+"))
+(setq java-bytecodes
   (concat "\\([scadiflb]a?"
           "\\(\\(load\\)\\|\\(store\\)\\|\\(const\\)\\|\\(return\\)\\)\\(_[0123]\\)?\\)"
           "\\|"
@@ -13,10 +24,13 @@
           "\\|"
           "\\(getfield\\|putfield\\)"))
 
-(defvar javap-font-lock-keywords
+(setq javap-font-lock-keywords
   `(
     ("\\(BoxesRunTime.*?\\):"
      1 font-lock-warning-face)
+
+    (,(concat "\\(" java-ident-dotted-re "\\)(")
+     1 font-lock-function-name-face)
 
     ("[0-9]+\\:"
      . font-lock-preprocessor-face)
@@ -27,17 +41,17 @@
     ("\\(public\\)\\|\\(private\\)\\|\\(final\\)\\|\\(static\\)\\|\\(class\\)"
      . font-lock-keyword-face)
 
-    ("\\(\svoid\s\\)\\|long\\|int\\|byte\\|short"
+    ("\\(\svoid\s\\)\\|\\(long\\)\\|\\(int\\)\\|\\(byte\\)\\|\\(short\\)"
      . font-lock-type-face)
 
     ("\\(#[0-9]+\\)"
      1 font-lock-preprocessor-face)
 
-    ("Method\\|Field"
-     . font-lock-string-face)
+    (,(concat "\\(Method\\|Field\\)\s" java-ident-slashed-re "\\(\\." java-ident-re "\\)?")
+     . font-lock-constant-face)
 
-    (,java-ident-slashed-re
-     . font-lock-function-name-face)
+    ;; (,java-ident-slashed-re
+    ;;  . font-lock-function-name-face)
 
     (,java-ident-dotted-re
      . font-lock-type-face)))
@@ -47,6 +61,9 @@
 (define-derived-mode javap-mode fundamental-mode "Java Decompile"
   "javap-mode is for viewing decompiled class files"
   (set (make-local-variable 'font-lock-defaults) '(javap-font-lock-keywords))
+  (set (make-local-variable 'javap-enabled-complete) 1)
+
+  (use-local-map javap-mode-map)
   (setq comment-start "//")
   (setq commend-end "")
 )
@@ -65,18 +82,21 @@
      )))
 
 (defun call-javap (cwd class)
-  (let ((wrapped-command (concat "pushd " cwd " && javap -c " class " && popd")))
+  (let* ((args (concat (if javap-enabled-complete "-c") " "))
+         (wrapped-command (concat "pushd " cwd " && javap " args class " && popd")))
     (shell-command-to-string wrapped-command)))
 
 (parse-java-class-name "/home/ahinz/src/azavea/geotrellis/target/scala-2.10/classes/geotrellis/raster/op/zonal/Histogram$$anonfun$createTileResults$1.class")
 
 (defun update-buffer-with-javap ()
   (let ((buf (current-buffer))
+        (p (point))
         (path-and-class (parse-java-class-name buffer-file-name)))
     (when (string-equal major-mode "javap-mode")
       (erase-buffer)
       (insert (call-javap (first path-and-class) (second path-and-class)))
-      (toggle-read-only 1)
+      (goto-char p)
+      ;(toggle-read-only 1)
       (set-buffer-modified-p nil))))
 
 
